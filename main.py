@@ -9,6 +9,17 @@ import easyocr
 reader = easyocr.Reader(['en'], gpu=False)
 
 
+def scanLisence(croppedImage):
+    license_plate_crop_gray = cv2.cvtColor(croppedImage, cv2.COLOR_BGR2GRAY)
+    _, license_plate_crop_thresh = cv2.threshold(license_plate_crop_gray, 64, 255, cv2.THRESH_BINARY_INV)
+    detections = reader.readtext(license_plate_crop_thresh)
+
+    for detection in detections:
+        bbox, text, score = detection
+        text = text.upper().replace(' ', '')
+        return text
+    return ''
+
 # load yolov8 model
 model = YOLO('car/first.pt')
 
@@ -52,15 +63,8 @@ while ret:
                 croppedImage=frame[y1:y2, x1:x2]
                 cv2.imshow('CROPPED', croppedImage)
                 
-                license_plate_crop_gray = cv2.cvtColor(croppedImage, cv2.COLOR_BGR2GRAY)
-                _, license_plate_crop_thresh = cv2.threshold(license_plate_crop_gray, 64, 255, cv2.THRESH_BINARY_INV)
-                detections = reader.readtext(license_plate_crop_thresh)
-
-                for detection in detections:
-                    bbox, text, score = detection
-
-                    text = text.upper().replace(' ', '')
-                    print(text)
+                lisence=scanLisence(croppedImage)
+                print(lisence)
                 #croppedImage()
                 #threading.Thread(target=scanLisence,args=(croppedImage,)).start()
                 
