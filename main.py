@@ -17,6 +17,7 @@ def scanLisence(croppedImage):
     for detection in detections:
         bbox, text, score = detection
         text = text.upper().replace(' ', '')
+        print(text)
         return text
     return ''
 
@@ -54,7 +55,7 @@ while ret:
             print("Probability:", conf)
             print("---")"""
 
-            if(conf>0.3):
+            if(conf>0.1):
                 x1=cords[0]
                 y1=cords[1]
                 x2=cords[2]
@@ -63,10 +64,9 @@ while ret:
                 croppedImage=frame[y1:y2, x1:x2]
                 cv2.imshow('CROPPED', croppedImage)
                 
-                lisence=scanLisence(croppedImage)
-                print(lisence)
+               
                 #croppedImage()
-                #threading.Thread(target=scanLisence,args=(croppedImage,)).start()
+                threading.Thread(target=scanLisence,args=(croppedImage,)).start()
                 
                 #cv2.rectangle(frame, (x1, y1), (x2, y2), (0, 255, 0), 2)
                 
