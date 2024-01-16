@@ -1,5 +1,0 @@
-ultralytics==8.1.1
-opencv-python==4.9.0.80
-numpy==1.26.3
-easyocr==1.7.1
-threaded==4.2.0
