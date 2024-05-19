@@ -1,76 +1,67 @@
 import cv2
-import numpy as np
-import threading
-import easyocr
+from openalpr import Alpr
+import Jetson.GPIO as GPIO
+import time
 
 
+GPIO.setmode(GPIO.BOARD)
+output_pin = 29
+GPIO.setup(output_pin, GPIO.OUT)
 
-reader = easyocr.Reader(['en'], gpu=False)
+plates=["10LL841","99ZF822","99ZR822"]
 
+def main():
+    # OpenALPR nesnesini başlat
+    alpr = Alpr("sg", "/etc/openalpr/openalpr.conf", "/usr/share/openalpr/runtime_data")
 
-def scanLisence(croppedImage):
-    license_plate_crop_gray = cv2.cvtColor(croppedImage, cv2.COLOR_BGR2GRAY)
-    _, license_plate_crop_thresh = cv2.threshold(license_plate_crop_gray, 64, 255, cv2.THRESH_BINARY_INV)
-    detections = reader.readtext(license_plate_crop_thresh)
+    # Alpr başlatılamazsa hata mesajı ver
+    if not alpr.is_loaded():
+        print("OpenALPR yüklenemedi. Lütfen yüklemeyi kontrol edin.")
+        return
 
-    for detection in detections:
-        bbox, text, score = detection
-        text = text.upper().replace(' ', '')
-        print(text)
-        return text
-    return ''
-
-# load yolov8 model
-model = YOLO('car/first.pt')
-
-# load video
-cap = cv2.VideoCapture(0)
-
-ret = True
-# read frames
-while ret:
-    ret, frame = cap.read()
-
-    if ret:
-
-        # detect objects
-        # track objects
-        results = model.track(frame, persist=True,verbose=False)
-
-        # plot results
-        # cv2.rectangle
-        # cv2.putText
-        frame_ = results[0].plot()
-        result=results[0]
+    # USB kamerayı başlat
+    cap = cv2.VideoCapture(0)
+  
+    while True:
+        # Görüntüyü al
+        ret, frame = cap.read()
         
-        if(len(result.boxes)>0):
-            box=result.boxes[0]
-            class_id = result.names[box.cls[0].item()]
-            cords = box.xyxy[0].tolist()
-            cords = [round(x) for x in cords]
-            conf = round(box.conf[0].item(), 2)
-            """print("Object type:", class_id)
-            print("Coordinates:", cords)
-            print("Probability:", conf)
-            print("---")"""
+        # Plakaları tanı
+        results = alpr.recognize_ndarray(frame)
 
-            if(conf>0.1):
-                x1=cords[0]
-                y1=cords[1]
-                x2=cords[2]
-                y2=cords[3]
-
-                croppedImage=frame[y1:y2, x1:x2]
-                cv2.imshow('CROPPED', croppedImage)
-                
-               
-                #croppedImage()
-                threading.Thread(target=scanLisence,args=(croppedImage,)).start()
-                
-                #cv2.rectangle(frame, (x1, y1), (x2, y2), (0, 255, 0), 2)
+        # Tanımlanan plakaları çerçevele
+      
+        for plate in results['results']:
+            for candidate in plate['candidates'][:1]:
+                # Plakayı ve güven puanını al
+                plate_str = candidate['plate']
+                confidence = candidate['confidence']
                 
 
-        # visualize
-        cv2.imshow('frame', frame_)
-    if cv2.waitKey(25) & 0xFF == ord('q'):
-        break
+                if plate_str in plates:
+                    GPIO.output(output_pin, GPIO.HIGH)
+                    time.sleep(0.5)
+                    GPIO.output(output_pin, GPIO.LOW)
+                print(plate_str)
+
+
+                # Plakayı ve güven puanını çerçevele
+                if confidence > 0:
+                    coordinates = plate['coordinates']
+                    cv2.rectangle(frame, (coordinates[0]['x'], coordinates[0]['y']), (coordinates[2]['x'], coordinates[2]['y']), (255, 0, 0), 2)
+                    cv2.putText(frame, plate_str , (coordinates[0]['x'], coordinates[0]['y']), cv2.FONT_HERSHEY_SIMPLEX, 2, (0, 255, 0), 2)
+
+        # Çerçeveli görüntüyü göster
+        #cv2.imshow('OpenALPR', frame)
+
+        # Çıkış için 'q' tuşuna basın
+        if cv2.waitKey(1) & 0xFF == ord('q'):
+            break
+
+    # Temizlik ve çıkış
+    cap.release()
+    cv2.destroyAllWindows()
+    GPIO.cleanup()
+
+if __name__ == '__main__':
+    main()
